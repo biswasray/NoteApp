@@ -1,6 +1,12 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using NoteApp.Business;
+using NoteApp.Common;
 using NoteApp.Entities;
+using static Microsoft.Extensions.Logging.EventSource.LoggingEventSource;
+using System.Collections.Generic;
+using NoteApp.DataAccess;
 
 namespace NoteApp.Controllers
 {
@@ -8,53 +14,60 @@ namespace NoteApp.Controllers
     [Route("api/[controller]")]
     public class NoteController : Controller
     {
-        [HttpGet]
-        public List<Note> GetAll()
+        ApplicationDbContext applicationDbContext;
+        NoteService service;
+        public NoteController(ApplicationDbContext applicationDbContext) {
+            this.applicationDbContext = applicationDbContext;
+            service=new NoteService(this.applicationDbContext);
+        }
+        [HttpGet("all")]
+        public ActionResult GetAll()
         {
-            List<Note> notes = new List<Note>();
-            foreach (var item in TestDb.NoteDb)
-            {
-                notes.Add(item.Value);
-            }
-            return notes;
+            var result = service.GetAll();
+            return Ok(result);
+        }
+        [HttpGet]
+        public ActionResult Get(string? sort, string? keyword, bool? desc,int page = 1, int limit = 4)
+        {
+            //if (sort == null&& keyword == null&& desc == null && page == null && limit == null)
+            //{
+            //    List<Note> notes0 = service.GetAll().ToList();
+            //    return Ok(notes0);
+            //}
+            var result = service.Query(sort,keyword,desc, page,limit);
+            return Ok(result);
         }
         [HttpGet("{id}")]
-        public Note Get(string id)
+        public ActionResult Get(string id)
         {
-            return TestDb.NoteDb[id];
+            var note = service.GetById(id);
+            return Ok(new Response<Note>()
+            {
+                Status = true,
+                Results = note
+            });
         }
         [HttpPost]
-        public Note Create(Note data)
+        public ActionResult Create(Note data)
         {
-            Note note = new Note()
+            var note = service.Add(data);
+            return Ok(new Response<Note>()
             {
-                Id = Guid.NewGuid().ToString(),
-                Title = data.Title,
-                Body = data.Body,
-                CreatedAt = DateTime.Now,
-                UpdatedAt = DateTime.Now
-            };
-            TestDb.NoteDb.Add(note.Id, note);
-            Console.WriteLine(TestDb.NoteDb.Count);
-            return TestDb.NoteDb[note.Id];
+                Status=true,
+                Results= note
+            });
         }
         [HttpPut("{id}")]
         public ActionResult Update(string id, Note data)
         {
-            Note note = TestDb.NoteDb[id];
-            if (data.Title != null)
-                note.Title = data.Title;
-            if (data.Body != null)
-                note.Body = data.Body;
-            note.UpdatedAt = DateTime.Now;
-            TestDb.NoteDb[id] = note;
-            return Ok(new { Status = true });
+            service.Update(id, data);
+            return Ok(new Response<string>() { Status = true });
         }
         [HttpDelete("{id}")]
         public ActionResult Delete(string id)
         {
-            TestDb.NoteDb.Remove(id);
-            return Ok(new { Status = true });
+            service.Remove(id);
+            return Ok(new Response<string>(){ Status = true });
         }
     }
 }
